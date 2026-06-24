@@ -65,7 +65,7 @@ router.post("/send-invoice", async (req, res) => {
 // ─────────────────────────────────────────────
 router.post("/send-campaign", async (req, res) => {
   try {
-    const { title, body: campaignBody, target = "all", memberIds } = req.body;
+    const { title, body: campaignBody, target = "all", memberIds, imageUrl } = req.body;
 
     if (!title || !campaignBody) {
       return res.status(400).json({ error: "title and body are required" });
@@ -98,7 +98,7 @@ router.post("/send-campaign", async (req, res) => {
     }
 
     // Create campaign record
-    const campaignRef = await addDoc(collection(db, "campaigns"), {
+    const campaignDoc = {
       title,
       body: campaignBody,
       target,
@@ -107,7 +107,9 @@ router.post("/send-campaign", async (req, res) => {
       failed: 0,
       status: "sending",
       createdAt: new Date().toISOString(),
-    });
+    };
+    if (imageUrl) campaignDoc.imageUrl = imageUrl;
+    const campaignRef = await addDoc(collection(db, "campaigns"), campaignDoc);
 
     // Send response immediately, process in background
     res.json({
@@ -132,7 +134,8 @@ router.post("/send-campaign", async (req, res) => {
             });
           } catch (_) { /* non-critical */ }
         }
-      }
+      },
+      imageUrl || null
     );
 
     // Update final status

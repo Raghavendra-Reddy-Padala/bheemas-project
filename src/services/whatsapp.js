@@ -159,6 +159,37 @@ export async function sendCampaignMessage(phone, memberName, campaignTitle, camp
 }
 
 /**
+ * Send a campaign message WITH an image header.
+ *
+ * Template: campaign_image
+ * Expected template header: IMAGE (media)
+ * Expected template body parameters:
+ *   {{1}} = member name
+ *   {{2}} = campaign title
+ *   {{3}} = campaign body/description
+ */
+export async function sendCampaignImageMessage(phone, memberName, campaignTitle, campaignBody, imageUrl) {
+  const components = [
+    {
+      type: "header",
+      parameters: [
+        { type: "image", image: { link: imageUrl } },
+      ],
+    },
+    {
+      type: "body",
+      parameters: [
+        { type: "text", text: memberName },
+        { type: "text", text: campaignTitle },
+        { type: "text", text: campaignBody },
+      ],
+    },
+  ];
+
+  return sendTemplateMessage(phone, "campaign_image_", "en", components);
+}
+
+/**
  * Send bulk messages with rate limiting to avoid Meta API throttling.
  * Processes messages sequentially with a delay between each.
  *
@@ -166,9 +197,10 @@ export async function sendCampaignMessage(phone, memberName, campaignTitle, camp
  * @param {string} campaignTitle
  * @param {string} campaignBody
  * @param {function} onProgress - Callback with (sent, total, result)
+ * @param {string|null} imageUrl - Optional image URL for image campaigns
  * @returns {Promise<{sent: number, failed: number, results: Array}>}
  */
-export async function sendBulkCampaign(recipients, campaignTitle, campaignBody, onProgress) {
+export async function sendBulkCampaign(recipients, campaignTitle, campaignBody, onProgress, imageUrl = null) {
   const results = [];
   let sent = 0;
   let failed = 0;
@@ -176,7 +208,10 @@ export async function sendBulkCampaign(recipients, campaignTitle, campaignBody, 
   for (let i = 0; i < recipients.length; i++) {
     const { phone, name } = recipients[i];
 
-    const result = await sendCampaignMessage(phone, name, campaignTitle, campaignBody);
+    // Use image template if imageUrl is provided, otherwise text-only
+    const result = imageUrl
+      ? await sendCampaignImageMessage(phone, name, campaignTitle, campaignBody, imageUrl)
+      : await sendCampaignMessage(phone, name, campaignTitle, campaignBody);
     results.push(result);
 
     if (result.success) sent++;
