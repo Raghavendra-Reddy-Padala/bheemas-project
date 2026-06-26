@@ -54,8 +54,8 @@ async function markReminderSent(memberId, type, memberName, phone, result) {
 /**
  * Run the expiry check for all members.
  * Sends reminders for:
- * - Members expiring within 7 days (but more than 1 day) → expiry_reminder_week
- * - Members expiring within 1 day (today or tomorrow) → expiry_reminder_day
+ * - Members expiring in exactly 7 days → expiry_reminder_week
+ * - Members expiring in exactly 1 day  → expiry_reminder_day
  *
  * Skips members who already received a reminder today.
  * Returns summary of actions taken.
@@ -79,8 +79,8 @@ export async function runExpiryCheck() {
 
       const days = daysUntil(member.expiryDate);
 
-      // 1-day reminder: expiring today or tomorrow
-      if (days >= 0 && days <= 1) {
+      // 1-day reminder: expiring tomorrow
+      if (days === 1) {
         const alreadySent = await wasReminderSent(member.id, "day");
         if (alreadySent) {
           skipped++;
@@ -96,8 +96,8 @@ export async function runExpiryCheck() {
         // Small delay between messages
         await sleep(250);
       }
-      // 7-day reminder: expiring within 2-7 days
-      else if (days >= 2 && days <= 7) {
+      // 7-day reminder: expiring in exactly 7 days
+      else if (days === 7) {
         const alreadySent = await wasReminderSent(member.id, "week");
         if (alreadySent) {
           skipped++;
