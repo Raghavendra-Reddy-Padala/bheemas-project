@@ -61,7 +61,7 @@ router.post("/send-invoice", async (req, res) => {
 // ─────────────────────────────────────────────
 // POST /api/send-campaign
 // Called by CRM campaign page.
-// Body: { title, body, target: "all" | "active" | "expired", memberIds?: string[] }
+// Body: { title, body, target: "all" | "active" | "expired" | "old_members", memberIds?: string[] }
 // ─────────────────────────────────────────────
 router.post("/send-campaign", async (req, res) => {
   try {
@@ -71,27 +71,38 @@ router.post("/send-campaign", async (req, res) => {
       return res.status(400).json({ error: "title and body are required" });
     }
 
-    // Fetch members
-    const membersSnap = await getDocs(collection(db, "members"));
-    let members = membersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    let recipients = [];
 
-    // Filter by target
-    if (memberIds && Array.isArray(memberIds) && memberIds.length > 0) {
-      members = members.filter((m) => memberIds.includes(m.id));
-    } else if (target === "active") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      members = members.filter((m) => m.expiryDate && new Date(m.expiryDate) >= today);
-    } else if (target === "expired") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      members = members.filter((m) => m.expiryDate && new Date(m.expiryDate) < today);
+    if (target === "old_members") {
+      // Fetch from the separate old_gym_contacts collection
+      const oldSnap = await getDocs(collection(db, "old_gym_contacts"));
+      recipients = oldSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((m) => m.mobile)
+        .map((m) => ({ phone: m.mobile, name: m.name, id: m.id }));
+    } else {
+      // Fetch from regular members collection
+      const membersSnap = await getDocs(collection(db, "members"));
+      let members = membersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Filter by target
+      if (memberIds && Array.isArray(memberIds) && memberIds.length > 0) {
+        members = members.filter((m) => memberIds.includes(m.id));
+      } else if (target === "active") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        members = members.filter((m) => m.expiryDate && new Date(m.expiryDate) >= today);
+      } else if (target === "expired") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        members = members.filter((m) => m.expiryDate && new Date(m.expiryDate) < today);
+      }
+
+      // Filter out members without mobile
+      recipients = members
+        .filter((m) => m.mobile)
+        .map((m) => ({ phone: m.mobile, name: m.name, id: m.id }));
     }
-
-    // Filter out members without mobile
-    const recipients = members
-      .filter((m) => m.mobile)
-      .map((m) => ({ phone: m.mobile, name: m.name, id: m.id }));
 
     if (recipients.length === 0) {
       return res.status(400).json({ error: "No recipients found for the selected target" });
